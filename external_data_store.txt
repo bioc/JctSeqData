@@ -1,0 +1,17 @@
+data
+inst/extdata/annoFiles
+inst/extdata/cts
+inst/extdata/cts/SAMP1
+inst/extdata/cts/SAMP2
+inst/extdata/cts/SAMP3
+inst/extdata/cts/SAMP4
+inst/extdata/cts/SAMP5
+inst/extdata/cts/SAMP6
+inst/extdata
+inst/extdata/tiny
+inst/extdata/tiny/SAMP1
+inst/extdata/tiny/SAMP2
+inst/extdata/tiny/SAMP3
+inst/extdata/tiny/SAMP4
+inst/extdata/tiny/SAMP5
+inst/extdata/tiny/SAMP6
