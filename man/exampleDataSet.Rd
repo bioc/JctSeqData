@@ -44,8 +44,6 @@
 }
 \format{JunctionSeqCountSet}
 \examples{
-library("JunctionSeq");
-
 #The smaller example dataset was generated using the code:
 decoder.file <- system.file(
         "extdata/annoFiles/decoder.bySample.txt",
@@ -60,11 +58,15 @@ countFiles <- system.file(paste0("extdata/tiny/",
         decoder$sample.ID,
         "/QC.spliceJunctionAndExonCounts.withNovel.forJunctionSeq.txt.gz"),
         package="JctSeqData");
+
+\dontrun{
+library("JunctionSeq");
 jscs <- runJunctionSeqAnalyses(sample.files = countFiles,
         sample.names = decoder$sample.ID,
         condition=factor(decoder$group.ID),
         flat.gff.file = gff.file,
         analysis.type = "junctionsAndExons");
+}
 }
 
 \source{
