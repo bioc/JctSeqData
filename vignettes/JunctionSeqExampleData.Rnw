@@ -1,0 +1,479 @@
+%\VignetteIndexEntry{Example Walkthrough}
+%\VignettePackage{JctSeqData}
+%\VignetteEngine{knitr::knitr_notangle}
+
+\documentclass[12pt]{article}
+
+<<knitr, echo=FALSE, results="hide">>=
+library("knitr")
+opts_chunk$set(tidy=FALSE,dev="png",fig.show="hide",
+               fig.width=6.5,fig.height=5.5,fig.keep="high",
+               message=FALSE)
+@
+
+<<getVers, echo=FALSE, results="hide">>=
+#Get the versions, if available. otherwise fall back to the static version.
+
+suppressWarnings({
+  QoRTsStaticVer = "1.0.1" #REPLACE_THIS_LINE_WITH_QORTS_VERSION_NUMBER
+  QoRTsVer <- if( requireNamespace("QoRTs", quietly=TRUE) ){ packageVersion("QoRTs") } else { QoRTsStaticVer }
+  JSStaticVer = "1.0.0" #REPLACE_THIS_LINE_WITH_JUNCTIONSEQ_VERSION_NUMBER
+  JSVer <- if( requireNamespace("JunctionSeq", quietly=TRUE) ){ packageVersion("JunctionSeq") } else { JSStaticVer }
+})
+
+@
+
+\usepackage{amsmath,amssymb}
+\usepackage[top=0.75in, bottom=0.75in, left=0.75in, right=0.5in]{geometry}
+\usepackage{framed}
+\usepackage{graphicx}
+\usepackage[colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=red]{hyperref}
+
+\usepackage[sort]{cite}
+\usepackage{hyperref}
+\hypersetup{bookmarksopen=false}
+
+%------------------------------------------------------------
+% newcommands
+%------------------------------------------------------------
+\newcommand{\myincfigRaw}[4]{%
+  \begin{figure}[h]
+  \centering
+  \includegraphics[width=#3]{#2}
+  \caption{\label{#2}#4}
+  \label{#1}
+  \end{figure}
+}
+\let\olditemize\itemize
+\renewcommand{\itemize}{
+  \olditemize
+  \setlength{\itemsep}{1pt}
+  \setlength{\parskip}{0pt}
+  \setlength{\parsep}{0pt}
+}
+
+\title{The QoRTs Analysis Pipeline\\
+Example Walkthrough}
+
+\author{Stephen Hartley \\
+National Human Genome Research Institute \\
+National Institutes of Health
+}
+
+\begin{document}
+
+\maketitle
+
+%VERSIONS:
+\begin{center}
+\textbf{QoRTs v\Sexpr{QoRTsVer}} \\
+\textbf{JunctionSeq v\Sexpr{JSVer}}
+\end{center}
+
+\tableofcontents
+
+<<setup,echo=FALSE,results="hide">>=
+options(width=80, signif=3, digits=3, prompt=" ", continue=" ")
+set.seed(0xdada)
+#suppressWarnings({
+#      library("JunctionSeq")
+#})
+@ 
+
+%-----------------------------------------------------------
+\section{Overview} \label{sec:praeludium}
+%-----------------------------------------------------------
+
+This package contains data produced by the QoRTs\cite{QoRTs} software package, which is a fast, efficient, and portable multifunction toolkit designed to assist in the analysis, quality control, and data management of RNA-Seq datasets. Its primary function is to aid in the detection and identification of errors, biases, and artifacts produced by paired-end high-throughput RNA-Seq technology. In addition, it can produce count data designed for use with differential expression \footnote{Such as \texttt{DESeq}, \texttt{DESeq2}\cite{DESeq} or \texttt{edgeR}\cite{edgeR}} and differential exon usage tools \footnote{Such as \texttt{DEXSeq}\cite{DEXSeq} or \texttt{JunctionSeq}}, as well as individual-sample and/or group-summary genome track files suitable for use with the UCSC genome browser (or any compatible browser).
+
+The QoRTs package is composed of two parts: a java jar-file (for data processing) and a companion R package (for generating tables, figures, and plots). The java utility is written in the Scala programming language (v2.11.1), however, it has been compiled to java byte-code and does not require an installation of Scala (or any other external libraries) in order to function. The entire QoRTs toolkit can be used in almost any operating system that supports java and R.
+
+The most recent release of QoRTs is available on the QoRTs \href{http://hartleys.github.io/QoRTs/index.html}{github page}.
+
+A complete and comprehensive walkthrough demontrating a full set of analyses using DESeq2, edgeR, DEXSeq, and JunctionSeq, is \href{http://hartleys.github.io/JunctionSeq/doc/example-walkthrough.pdf}{available online}, along with a full \href{https://dl.dropboxusercontent.com/u/103621176/pipelineWalkthrough/QoRTsPipelineWalkthrough.zip}{example dataset} (file is ~200mb) with 
+\href{https://dl.dropboxusercontent.com/u/103621176/pipelineWalkthrough/bamfiles.zip}{example bam files} (file is ~1.1gb).
+
+%-----------------------------------------------------------
+\section{Data Contained in this package}  \label{sec:datasets}
+%-----------------------------------------------------------
+
+The example dataset is derived from a set of rat pineal gland samples, which were multiplexed and sequenced across six sequencer lanes. All samples are paired-end, 2x101 base-pair, strand-specific RNA-Seq. They were ribosome-depleted using the "Ribo-zero Gold" protocol and aligned via RNA-STAR.
+
+For the sake of simplicity, the example dataset was limited to only six samples and three lanes. However, the bam files alone would still occupy 18 gigabytes of disk space, which would make it unsuitable for distribution as an example dataset. To further reduce the example bamfile sizes, only reads that mapped to chromosomes chr14, chr15, chrX, and chrM were included. Additionally, all the selected chromosomes EXCEPT for chromosome 14 were randomly downsampled to 30 percent of their original read counts. A few genes had additional fictional transcripts added, to test and demonstrate various tools' handling of certain edge cases. The original dataset from which these samples were derived is described elsewhere\cite{ratPineal}. The original complete dataset is available on the NCBI Gene Expression Omnibus, \href{http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE63309}{series accession number GSE63309}.
+
+THIS DATASET IS INTENDED FOR DEMONSTRATION AND TESTING PURPOSES ONLY. Due to the various alterations that have been made to reduce file sizes and improve portability, it is really not suitable for any actual analyses.
+
+%-----------------------------------------------------------
+\subsection{Example Dataset}  \label{sec:exdata}
+%-----------------------------------------------------------
+
+For simplicity, we renamed the samples SAMP1 through SAMP6, and renamed the conditions "CASE" and "CTRL" for night and day, respectively.
+
+Thus: there are 6 samples: 3 "cases" and 3 "controls":
+<<decoder>>=
+#Read the decoder:
+decoder.file <- system.file("extdata/annoFiles/decoder.bySample.txt",
+                             package="JctSeqData");
+decoder <- read.table(decoder.file,
+                      header=TRUE,
+                      stringsAsFactors=FALSE);
+print(decoder);
+@
+
+%-----------------------------------------------------------
+\subsection{Annotation Files}  \label{sec:annoFiles}
+%-----------------------------------------------------------
+
+There are several gtf or gff annotation files included in the data package:
+<<gffdata>>=
+#The original gtf file, from Ensembl 
+#  (all but a few genes were removed, to save space):
+anno.original.gtf.file <- system.file("extdata/annoFiles/anno-original.gtf.gz",
+                        package="JctSeqData");
+head(read.table(anno.original.gtf.file,sep='\t'));
+
+#Modified gtf file, with a few genes 
+#  changed to make them into a better test dataset:
+anno.gtf.file <- system.file("extdata/annoFiles/anno.gtf.gz",
+                        package="JctSeqData");
+head(read.table(anno.gtf.file,sep='\t'));
+
+#"Flattened" gff file, for DEXSeq:
+DEX.gff.file <- system.file("extdata/annoFiles/DEXSeq.flat.gff.gz",
+                        package="JctSeqData");
+head(read.table(DEX.gff.file,sep='\t'));
+
+#"Flattened" gff file, for JunctionSeq
+#  (w/o novel splice junctions):
+JS.gff.file <- system.file("extdata/annoFiles/JunctionSeq.flat.gff.gz",
+                        package="JctSeqData");
+head(read.table(JS.gff.file,sep='\t'));
+
+#"Flattened" gff file, for JunctionSeq
+#  (w/ novel splice junctions):
+JS.novel.gff.file <- 
+    system.file("extdata/annoFiles/withNovel.forJunctionSeq.gff.gz",
+                        package="JctSeqData");
+head(read.table(JS.novel.gff.file,sep='\t'));
+@
+
+There are several other annotation files as well:
+<<otherAnno>>=
+#rn6 chrom.sizes file, from UCSC:
+rn6.chrom.sizes <- system.file("extdata/annoFiles/rn6.chrom.sizes",
+                        package="JctSeqData");
+head(read.table(rn6.chrom.sizes,sep='\t'));
+
+
+#stripped-down chrom.sizes file
+# only includes chr14, chrX, chrM, and loose chr14 contigs:
+chrom.sizes <- system.file("extdata/annoFiles/chrom.sizes",
+                        package="JctSeqData");
+head(read.table(chrom.sizes,sep='\t'));
+
+#mapping of ensembl id to gene symbol:
+ensid.2.symbol.file <- system.file("extdata/annoFiles/ensid.2.symbol.txt",
+                        package="JctSeqData");
+head(read.table(ensid.2.symbol.file,sep='\t',header=TRUE));
+@
+
+%-----------------------------------------------------------
+\subsection{Count Files}  \label{sec:countFiles}
+%-----------------------------------------------------------
+
+There are numerous count files included in this data package, intended for use with various external
+analysis packages:
+
+For use with DESeq, DESeq2, edgeR, limma-voom, or similar gene-level, count-based differential expression tools, we can use the gene-level counts:
+<<DESeqCounts>>=
+#Recall the decoder:
+print(decoder);
+
+#Gene level counts:
+gene.count.files <- system.file(paste0("extdata/cts/",
+                                       decoder$sample.ID,
+                                       "/QC.geneCounts.formatted.for.DESeq.txt.gz"
+                                       ),
+                        package="JctSeqData");
+
+#One of the count files:
+read.table(gene.count.files[1])[1:10,]
+@
+
+For use with DEXSeq or similar exon-level, count-based differential exon usage tools, we can use the exon-level counts:
+<<DEXSeqCounts>>=
+#Exon level counts:
+exon.count.files <- system.file(paste0("extdata/cts/",
+                                       decoder$sample.ID,
+                                       "/QC.exonCounts.formatted.for.DEXSeq.txt.gz"
+                                       ),
+                        package="JctSeqData");
+
+#Part of One of the count files:
+read.table(exon.count.files[1])[110:130,]
+@
+
+For use with JunctionSeq, we can use a combined gene/exon/junction count file:
+<<JSCounts>>=
+#JunctionSeq counts:
+JS.count.files <- system.file(
+    paste0("extdata/cts/",
+           decoder$sample.ID,
+           "/QC.spliceJunctionAndExonCounts.forJunctionSeq.txt.gz"
+           ),
+     package="JctSeqData");
+
+#Part of one of the count files:
+read.table(JS.count.files[1])[526:552,]
+@
+
+A similar file is available with novel splice junctions included:
+<<JSCounts2>>=
+#JunctionSeq counts:
+JS.novel.count.files <- system.file(
+    paste0("extdata/cts/",
+           decoder$sample.ID,
+           "/QC.spliceJunctionAndExonCounts.withNovel.forJunctionSeq.txt.gz"
+           ),
+     package="JctSeqData");
+
+#Part of one of the count files:
+read.table(JS.novel.count.files[1])[526:553,]
+@
+
+%-----------------------------------------------------------
+\subsection{Even smaller dataset}  \label{sec:tinydata}
+%-----------------------------------------------------------
+
+A similar set of count files are available for an even smaller, cut-down dataset.
+This dataset may be useful for running quick and easy tests.
+
+All the count files are available in the "extdata/tiny/" directory
+instead of the "extdata/cts/" directory. The annotation files
+are also available in the "extdata/tiny" directory.
+
+%-----------------------------------------------------------
+\subsection{R Data Objects}  \label{sec:dataobj}
+%-----------------------------------------------------------
+
+This package comes with a few R data objects as well, generated
+by JunctionSeq for running the JunctionSeq examples. You
+can load these using the commands:
+
+To load the full dataset:
+<<loadFullData>>=
+data(fullExampleDataSet,package="JctSeqData");
+@
+
+To load the "tiny" dataset:
+<<loadTinyData>>=
+data(exampleDataSet,package="JctSeqData");
+@
+
+\pagebreak
+%-----------------------------------------------------------
+\section{Recreating this data package} \label{sec:makeExDataPack}
+%-----------------------------------------------------------
+
+Only a small selection of the data generated and used in \href{http://hartleys.github.io/JunctionSeq/doc/example-walkthrough.pdf}{the pipeline walkthrough} has been packaged and distributed in the 
+\texttt{JctSeqData} R package. The data had to be reorganized in order to fit with the R package
+format. This section describes exactly how the JctSeqData package was generated.
+
+First you must download the \href{https://dl.dropboxusercontent.com/u/103621176/pipelineWalkthrough/QoRTsPipelineWalkthrough.zip}{full example output} (file is ~200mb). Optionally, you can also download the  
+\href{https://dl.dropboxusercontent.com/u/103621176/pipelineWalkthrough/bamfiles.zip}{example bam files} (file is ~1.1gb).
+
+Now we copy over the template and add in the data generated in this walkthrough:
+\begin{framed} \small \begin{verbatim}
+#make sure JctSeqData doesn't already exist:
+rm -rf outputData/JctSeqData
+#Copy over the template
+cp -R inputData/JctSeqData-template outputData/JctSeqData
+#Copy original annotation files:
+cp inputData/annoFiles/*.* outputData/JctSeqData/inst/extdata/annoFiles/
+#Copy additional generated annotation files:
+cp outputData/forJunctionSeq.gff.gz                       \
+   outputData/JctSeqData/inst/extdata/annoFiles/JunctionSeq.flat.gff.gz
+cp outputData/forDEXSeq.gff.gz                            \
+   outputData/JctSeqData/inst/extdata/annoFiles/DEXSeq.flat.gff.gz
+cp outputData/countTables/orphanSplices.gff.gz            \
+   outputData/JctSeqData/inst/extdata/annoFiles/
+cp outputData/countTables/withNovel.forJunctionSeq.gff.gz \
+   outputData/JctSeqData/inst/extdata/annoFiles/
+#Copy count tables:
+cp -R outputData/countTables/* outputData/JctSeqData/inst/extdata/cts/
+\end{verbatim}  \end{framed}
+
+\pagebreak
+Next we generate the "tiny" dataset used in the JunctionSeq examples and for rapid testing.
+This is done simply by using "egrep" to extract a subset of the genes from the various files:
+
+\begin{framed} \small \begin{verbatim}
+cd outputData/JctSeqData/inst/extdata/
+#Make a "egrep" regex string to extract the desired genes:
+FILTER="ENSRNOG00000048600|ENSRNOG00000045591|etc. etc.";
+#Note: this is only the start of the full regex string.
+#      see file inputData/JctSeqData-template/inst/extdata/tinyGeneList.txt
+#      for a full list of the extracted genes.
+
+#Subsample annotation files:
+zcat annoFiles/anno.gtf.gz | \
+      egrep $FILTER - | \
+      gzip -c - > tiny/anno.gtf.gz
+zcat annoFiles/JunctionSeq.flat.gff.gz | \
+      egrep $FILTER - | \
+      gzip -c - > tiny/JunctionSeq.flat.gff.gz
+zcat cts/withNovel.forJunctionSeq.gff.gz | \
+      egrep $FILTER - | \
+      gzip -c - > tiny/withNovel.forJunctionSeq.gff.gz
+zcat cts/withNovel.forJunctionSeq.gff.gz | \
+      egrep $FILTER - | \
+      gzip -c - > tiny/withNovel.forJunctionSeq.gff.gz
+#Subsample count files:
+while read line
+do
+  mkdir ./tiny/$line
+  echo $line
+  zcat cts/$line/QC.spliceJunctionAndExonCounts.withNovel.forJunctionSeq.txt.gz | \
+     egrep $FILTER - | \
+     gzip -c - > tiny/$line/QC.spliceJunctionAndExonCounts.withNovel.forJunctionSeq.txt.gz
+  zcat cts/$line/QC.exonCounts.formatted.for.DEXSeq.txt.gz | \
+     egrep $FILTER - | \
+     gzip -c - > tiny/$line/QC.exonCounts.formatted.for.DEXSeq.txt.gz
+  zcat cts/$line/QC.geneCounts.formatted.for.DESeq.txt.gz | \
+     egrep $FILTER - | \
+     gzip -c - > tiny/$line/QC.geneCounts.formatted.for.DESeq.txt.gz
+  zcat cts/$line/QC.spliceJunctionAndExonCounts.forJunctionSeq.txt.gz | \
+     egrep $FILTER - | \
+     gzip -c - > tiny/$line/QC.spliceJunctionAndExonCounts.forJunctionSeq.txt.gz
+  zcat cts/$line/QC.spliceJunctionCounts.knownSplices.txt.gz | \
+     egrep $FILTER - | \
+     gzip -c - > tiny/$line/QC.spliceJunctionCounts.knownSplices.txt.gz
+done < annoFiles/sampleID.list.txt
+cd ../../../../
+\end{verbatim}  \end{framed}
+
+\pagebreak
+
+We can install this almost-finished version of the package using the command:
+\begin{framed} \small \begin{verbatim}
+R CMD INSTALL outputData/JctSeqData
+\end{verbatim}  \end{framed}
+
+Next, we build the serialized "Rdata" files in R. To do this, first we load the datasets:
+<<loadExampleDataSetForSerialization>>=
+#Read the decoder:
+decoder.file <- system.file("extdata/annoFiles/decoder.bySample.txt",
+                             package="JctSeqData");
+decoder <- read.table(decoder.file,
+                      header=TRUE,
+                      stringsAsFactors=FALSE);
+#Here are the full-size count and gff files:
+gff.file.FULL <- system.file("extdata/cts/withNovel.forJunctionSeq.gff.gz",
+                        package="JctSeqData");
+countFiles.FULL <- system.file(paste0("extdata/cts/",
+      decoder$sample.ID,
+      "/QC.spliceJunctionAndExonCounts.withNovel.forJunctionSeq.txt.gz"),
+      package="JctSeqData");
+#Here are the "tiny" subset count and gff files:
+gff.file.TINY <- system.file("extdata/tiny/withNovel.forJunctionSeq.gff.gz",
+                        package="JctSeqData");
+countFiles.TINY <- system.file(paste0("extdata/tiny/",
+      decoder$sample.ID,
+      "/QC.spliceJunctionAndExonCounts.withNovel.forJunctionSeq.txt.gz"),
+      package="JctSeqData");
+@
+
+\pagebreak
+
+Next, we generate the full dataset:
+<<generateFullSerializedExData, eval = FALSE>>=
+jscs2 <- runJunctionSeqAnalyses(sample.files = countFiles,
+           sample.names = decoder$sample.ID,
+           condition=factor(decoder$group.ID),
+           flat.gff.file = gff.file);
+@
+And save it:
+<<saveSerializedExData1, eval = FALSE>>=
+save(jscs2, file = "outputData/JctSeqData/data/fullExampleDataSet.RData");
+@
+
+And then generate the "tiny" dataset:
+<<generateTinySerializedExData, eval = FALSE>>=
+jscs <- runJunctionSeqAnalyses(sample.files = countFiles.TINY,
+           sample.names = decoder$sample.ID,
+           condition=factor(decoder$group.ID),
+           flat.gff.file = gff.file.TINY);
+@
+And save it:
+<<saveSerializedExData2, eval = FALSE>>=
+save(jscs, file = "outputData/JctSeqData/data/tinyExampleDataSet.RData");
+@
+
+\pagebreak
+
+%--------------------------------------------------
+\section{References}
+%--------------------------------------------------
+
+\bibliographystyle{abbrv}
+\bibliography{JunctionSeqExampleData}
+
+%-----------------------------------------------------------
+\section{Legal} \label{sec:legal}
+%-----------------------------------------------------------
+
+This document and related software is "United States Government Work" under the terms of the United States Copyright Act.  It was written as part of the authors' official duties for the United States Government and thus cannot be copyrighted.  This software is freely available to the public for use without a copyright notice.  Restrictions cannot be placed on its present or future use.
+
+Although all reasonable efforts have been taken to ensure the accuracy and reliability of the software and data, the National Human Genome Research Institute (NHGRI) and the U.S. Government does not and cannot warrant the performance or results that may be obtained by using this software or data.  NHGRI and the U.S. Government disclaims all warranties as to performance, merchantability or fitness for any particular purpose.
+
+In any work or product derived from this material, proper attribution of the authors as the source of the software or data should be made, using "NHGRI Genome Technology Branch" as the citation.
+
+NOTE: The QoRTs Scala package includes (internally) the sam-JDK library (sam-1.113.jar), from picard tools, which is licensed under the MIT license:
+
+\begin{verbatim}
+    The MIT License
+    Copyright (c) 2009 The Broad Institute
+    Permission is hereby granted, free of charge, to any person
+    obtaining a copy of this software and associated documentation
+    files (the "Software"), to deal in the Software without
+    restriction, including without limitation the rights to use,
+    copy, modify, merge, publish, distribute, sublicense, and/or
+    sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following
+    conditions:
+    The above copyright notice and this permission notice shall be
+    included in all copies or substantial portions of the Software.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+    OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+    OTHER DEALINGS IN THE SOFTWARE.
+\end{verbatim}
+
+The MIT license and copyright information can also be accessed using the command:
+\begin{framed} \begin{verbatim}
+java -jar /path/to/jarfile/QoRTs.jar "?" samjdkinfo
+\end{verbatim}  \end{framed}
+
+JunctionSeq is based on the DEXSeq and DESeq2 packages, and is licensed with the GPL v3 license: 
+\begin{verbatim}
+    JunctionSeq is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    JunctionSeq is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with JunctionSeq.  If not, see <http://www.gnu.org/licenses/>.
+\end{verbatim}
+
+Other software mentioned in this document are subject to their own respective licenses.
+
+\end{document}
