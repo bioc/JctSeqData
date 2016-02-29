@@ -1,10 +1,10 @@
 Package: JctSeqData
-Version: 1.0.1
+Version: 1.1.13
 Title: Example Junction Count data for use with JunctionSeq
 Authors@R: c(person("Stephen", "Hartley", role = c("aut", "cre"),
            email = "JunctionSeq-contact@list.nih.gov", comment = "PhD"))
 Depends: R (>= 3.2.2)
-Suggests: knitr, BiocStyle, DESeq2, DEXSeq, edgeR, JunctionSeq
+Suggests: knitr, BiocStyle, DESeq2, DEXSeq, edgeR
 Description: Junction count data from an example dataset taken from a subset of the RNA-seq reads from six samples. Data was subsampled and modified to provide edge cases for testing and to reduce file sizes.
 License: file LICENSE
 VignetteBuilder: knitr
@@ -12,4 +12,8 @@ NeedsCompilation: no
 LazyData: true
 URL: http://hartleys.github.io/JunctionSeq/
 BugReports: http://github.com/hartleys/JunctionSeq/issues
-biocViews: Rattus_norvegicus_Data, ExperimentData, Genome, RNASeqData, RepositoryData, GEO
+biocViews: Rattus_norvegicus_Data, ExperimentData, Genome, RNASeqData,
+        RepositoryData, GEO
+Packaged: 2016-02-29 21:00:00 UTC; hartleys
+Author: Stephen Hartley [aut, cre] (PhD)
+Maintainer: Stephen Hartley <JunctionSeq-contact@list.nih.gov>
