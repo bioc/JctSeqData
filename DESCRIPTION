@@ -1,5 +1,5 @@
 Package: JctSeqData
-Version: 1.7.0
+Version: 1.8.0
 Title: Example Junction Count data for use with JunctionSeq
 Authors@R: c(person("Stephen", "Hartley", role = c("aut", "cre"),
            email = "JunctionSeq-contact@list.nih.gov", comment = "PhD"))
