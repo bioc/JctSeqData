@@ -1,5 +1,5 @@
 Package: JctSeqData
-Version: 1.21.0
+Version: 1.21.1
 Title: Example Junction Count data for use with JunctionSeq
 Authors@R: c(person("Stephen", "Hartley", role = c("aut", "cre"),
            email = "JunctionSeq-contact@list.nih.gov", comment = "PhD"))
@@ -17,3 +17,4 @@ biocViews: Rattus_norvegicus_Data, ExperimentData, Genome, RNASeqData,
 Packaged: 2016-02-29 21:00:00 UTC; hartleys
 Author: Stephen Hartley [aut, cre] (PhD)
 Maintainer: Stephen Hartley <JunctionSeq-contact@list.nih.gov>
+PackageStatus: Deprecated
